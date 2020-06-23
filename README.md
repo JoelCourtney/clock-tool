@@ -85,7 +85,7 @@ Use `clock edit` if you messed up and need to change something you already input
 
 The 9-element lists are python time.struct_time objects, of the form:
 
-```json
+```
 [
 	year,
 	month,
