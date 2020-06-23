@@ -1,0 +1,162 @@
+#! /usr/bin/env python3
+
+import sys
+import os
+import json
+import time
+import subprocess
+from pathlib import Path
+
+dir_name = 'hours/'
+current_log_name = 'current_period.json'
+
+def main():
+    if len(sys.argv) != 2:
+        print_help()
+    if sys.argv[1] == 'init':
+        init()
+    elif sys.argv[1] == 'in':
+        clock_in()
+    elif sys.argv[1] == 'out':
+        clock_out()
+    elif sys.argv[1] == 'edit':
+        edit()
+    elif sys.argv[1] == 'status':
+        status()
+    elif sys.argv[1] == 'commit':
+        commit()
+    else:
+        print_help()
+
+def print_help():
+    print("USAGE: clock <command>\n")
+    print("where <command> is one of:")
+    print("\tinit\tstart a new log in current directory")
+    print("\tin\tmark current time as beginning of work")
+    print("\tout\tmark current time as end of work")
+    print("\tedit\topen current pay-period log file in vim")
+    print("\tcommit\tfinalize current log file, print it, and start a new one")
+    exit(1)
+
+def write_log(data={'start_time':None,'entries':[]}, path=None):
+    if path is None:
+        with open(dir_name + current_log_name, 'w') as log:
+            json.dump(data, log, indent=4, separators=(',', ':'))
+    else:
+        with open(path, 'w') as log:
+            log.write(data)
+
+def read_log():
+    with open(dir_name + current_log_name) as log:
+        data = json.load(log)
+        data['entries'] = [
+                {'in': time.struct_time(entry['in']),
+                'out': time.struct_time(entry['out']),
+                'desc': entry['desc']}
+                for entry in data['entries']
+        ]
+        if data['start_time'] is not None:
+            data['start_time'] = time.struct_time(data['start_time'])
+        return data
+
+def init():
+    directory = Path(dir_name)
+    if directory.exists():
+        print('CANNOT INIT: ' + dir_name + ' ALREADY EXISTS')
+        exit(2)
+    else:
+        print('MAKING DIRECTORY: ' + dir_name)
+        os.mkdir(dir_name)
+        print('MAKING ACTIVE LOG FILE: ' + dir_name + current_log_name)
+        write_log()
+
+def clock_in():
+    data = read_log()
+    if data['start_time'] is not None:
+        print("ERROR: haven't clocked out from last time.")
+        exit(3)
+    current_time = time.localtime(time.time())
+    print('CLOCKING IN AT: ' + time.strftime('%a, %d %b %Y at %I:%M %p\n', current_time))
+    data['start_time'] = current_time
+    write_log(data)
+
+def clock_out():
+    data = read_log()
+    if data['start_time'] is None:
+        print("ERROR: haven't clocked in yet.")
+        exit(3)
+    desc = input('SHORT DESCRIPTION OF WORK DONE: ')
+    current_time = time.localtime(time.time())
+    print('CLOCKING OUT AT: ' + time.strftime('%a, %d %b %Y at %I:%M %p\n', current_time))
+    data['entries'].append({
+        'in': data['start_time'],
+        'out': current_time,
+        'desc': desc
+    })
+    data['start_time'] = None
+    write_log(data)
+
+def edit():
+    subprocess.run(["${EDITOR:-vi} " + dir_name + current_log_name], shell=True)
+
+def status():
+    data = read_log()
+
+    result = ''
+
+    if len(data['entries']) > 0:
+        first_time = data['entries'][0]['in']
+        start_day = time.strftime('%a, %d %b %Y', first_time)
+        last_time = data['entries'][-1]['out']
+        last_day = time.strftime('%a, %d %b %Y', last_time)
+
+        result += 'HOURS FROM ' + start_day + ' TO ' + last_day + '\n'
+        result += '=' * len(result) + '\n' * 2
+
+        total_time = 0
+        for entry in data['entries']:
+            diff = (time.mktime(entry['out']) - time.mktime(entry['in']))/3600
+            total_time += diff
+            result += time.strftime('%a, %d %b %Y', entry['in']) + ': ' \
+                + time.strftime('%I:%M %p', entry['in']) + ' to ' \
+                + time.strftime('%I:%M %p', entry['out']) + '\n'
+            result += entry['desc'] + '\n'
+            result += '%.2f HOURS\n\n' % diff
+
+        result += '\nTOTAL HOURS: %.2f\n' % total_time
+
+    else:
+        result += 'NO HOURS LOGGED YET.\n'
+
+    if data['start_time'] is not None:
+        result += '\nCLOCKED IN AT: ' \
+                + time.strftime('%a, %d %b %Y at %I:%M %p\n', data['start_time'])
+
+    print(result)
+    return result
+
+def commit():
+    data = read_log()
+    if data['start_time'] is not None:
+        print("ERROR: cannot commit until clocked out.")
+        exit(3)
+    if len(data['entries']) > 0:
+        first_time = data['entries'][0]['in']
+        start_day = time.strftime('%a, %d %b %Y', first_time)
+        last_time = data['entries'][-1]['out']
+        last_day = time.strftime('%a, %d %b %Y', last_time)
+        result = status()
+        confirm = input('ARE YOU SURE YOU WANT TO COMMIT? [y/N]: ')
+        if confirm == 'y':
+            file_name = dir_name + time.strftime('%d-%b-%y', first_time) \
+                    + '__' + time.strftime('%d-%b-%y', last_time) + '.txt'
+            print('\nWRITING TO FILE: ' + file_name)
+            write_log(result, file_name)
+            write_log()
+        else:
+            print("\nABORTING")
+    else:
+        print("NOTHING TO COMMIT.")
+
+if __name__ == '__main__':
+    main()
