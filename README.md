@@ -1,5 +1,6 @@
 # clock-tool
-Small command line tool for logging hours worked
+
+Small command line tool for logging hours worked.
 
 ## Installation
 
@@ -18,6 +19,7 @@ $ clock init
 MAKING DIRECTORY: hours/
 MAKING ACTIVE LOG FILE: hours/current_period.json
 ```
+
 Use `clock in` when you start working.
 
 ```sh
@@ -29,7 +31,7 @@ Use `clock out` when you stop, and follow the prompt.
 
 ```sh
 $ clock out
-SHORT DESCRIPTION OF WORK DONE: procrastinated by making a stupid script
+SHORT DESCRIPTION OF WORK DONE: procrastinated by making a script that logs hours
 CLOCKING OUT AT: <current local time>
 ```
 
@@ -77,7 +79,7 @@ Use `clock edit` if you messed up and need to change something you already input
 				174,
 				1
 			],
-			"desc":"procrastinated by making a stupid script"
+			"desc":"procrastinated by making a script that logs hours"
 		}
 	]
 }
